@@ -3,16 +3,22 @@ from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 from solver import FoodItem, Constraints, SolverStatus, solve_meal_plan
 import json
+import os
+import requests
+from dotenv import load_dotenv
 
-app = FastAPI(title="MealOpt API", version="0.1.0")
+load_dotenv()
 
-# Allow frontend to talk to backend
+app = FastAPI(title="MealOpt API", version="0.2.0")
+
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+GOOGLE_API_KEY = os.getenv("GOOGLE_PLACES_API_KEY")
 
 
 # ---- Load menu data on startup ----
@@ -58,7 +64,7 @@ class PlanRequest(BaseModel):
     carb_min: float | None = None
     carb_max: float | None = None
     budget_max: float | None = 15.00
-    mode: str = "all"  # "all", "grocery", "restaurant", "mix"
+    mode: str = "all"
 
 
 class FoodItemResponse(BaseModel):
@@ -83,6 +89,13 @@ class PlanResponse(BaseModel):
     total_cost: float
     cost_per_gram_protein: float
     solver_time_ms: float
+
+
+class NearbyRequest(BaseModel):
+    latitude: float
+    longitude: float
+    radius: int = 3000  # meters
+    type: str = "restaurant"  # restaurant, grocery_store, supermarket
 
 
 # ---- Helper ----
@@ -122,12 +135,15 @@ def format_result(result, food_to_location) -> PlanResponse:
 
 @app.get("/")
 def root():
-    return {"message": "MealOpt API is running", "foods_loaded": len(ALL_FOODS)}
+    return {
+        "message": "MealOpt API is running",
+        "foods_loaded": len(ALL_FOODS),
+        "google_places": "connected" if GOOGLE_API_KEY else "no key found",
+    }
 
 
 @app.get("/foods")
 def get_foods():
-    """List all available foods with their locations."""
     result = []
     for food in ALL_FOODS:
         loc = FOOD_TO_LOCATION[food.id]
@@ -148,8 +164,6 @@ def get_foods():
 
 @app.post("/optimize", response_model=PlanResponse)
 def optimize(req: PlanRequest):
-    """Generate an optimized meal plan."""
-
     constraints = Constraints(
         calorie_target=req.calorie_target,
         protein_min=req.protein_min,
@@ -160,7 +174,6 @@ def optimize(req: PlanRequest):
         budget_max=req.budget_max,
     )
 
-    # Filter foods based on mode
     if req.mode == "grocery":
         foods = [f for f in ALL_FOODS if f.category == "grocery"]
     elif req.mode == "restaurant":
@@ -172,8 +185,7 @@ def optimize(req: PlanRequest):
 
     if result.status == SolverStatus.INFEASIBLE:
         return PlanResponse(
-            status="infeasible",
-            items=[],
+            status="infeasible", items=[],
             total_calories=0, total_protein=0, total_fat=0,
             total_carbs=0, total_cost=0, cost_per_gram_protein=0,
             solver_time_ms=result.solver_time_ms,
@@ -184,9 +196,6 @@ def optimize(req: PlanRequest):
 
 @app.post("/optimize/mix")
 def optimize_mix(req: PlanRequest):
-    """Mix mode: one restaurant meal + groceries for the rest."""
-
-    # Step 1: Find best restaurant meal (~700 cal, ~40g protein)
     restaurant_foods = [f for f in ALL_FOODS if f.category == "restaurant"]
     restaurant_constraints = Constraints(
         calorie_target=700,
@@ -199,7 +208,6 @@ def optimize_mix(req: PlanRequest):
     if restaurant_result.status == SolverStatus.INFEASIBLE:
         return {"status": "infeasible", "message": "No restaurant meal found"}
 
-    # Step 2: Fill remaining macros with groceries
     grocery_foods = [f for f in ALL_FOODS if f.category == "grocery"]
     remaining = Constraints(
         calorie_target=max(req.calorie_target - restaurant_result.total_calories, 500),
@@ -228,3 +236,69 @@ def optimize_mix(req: PlanRequest):
             "total_cost": round(restaurant_result.total_cost + grocery_result.total_cost, 2),
         },
     }
+
+
+# ---- Google Places Nearby Search ----
+
+@app.post("/nearby")
+def nearby_places(req: NearbyRequest):
+    """Find nearby restaurants and grocery stores using Google Places API."""
+
+    if not GOOGLE_API_KEY:
+        return {"error": "Google Places API key not configured"}
+
+    url = "https://places.googleapis.com/v1/places:searchNearby"
+
+    # Map friendly names to Google place types
+    type_map = {
+        "restaurant": ["restaurant", "fast_food_restaurant", "meal_takeaway"],
+        "grocery": ["grocery_store", "supermarket"],
+        "all": ["restaurant", "fast_food_restaurant", "grocery_store", "supermarket"],
+    }
+
+    place_types = type_map.get(req.type, type_map["all"])
+
+    headers = {
+        "Content-Type": "application/json",
+        "X-Goog-Api-Key": GOOGLE_API_KEY,
+        "X-Goog-FieldMask": "places.displayName,places.formattedAddress,places.location,places.rating,places.priceLevel,places.types,places.googleMapsUri",
+    }
+
+    body = {
+        "includedTypes": place_types,
+        "maxResultCount": 20,
+        "locationRestriction": {
+            "circle": {
+                "center": {
+                    "latitude": req.latitude,
+                    "longitude": req.longitude,
+                },
+                "radius": req.radius,
+            }
+        },
+    }
+
+    try:
+        resp = requests.post(url, json=body, headers=headers)
+        data = resp.json()
+
+        if "places" not in data:
+            return {"places": [], "message": data.get("error", {}).get("message", "No results")}
+
+        places = []
+        for p in data["places"]:
+            places.append({
+                "name": p.get("displayName", {}).get("text", "Unknown"),
+                "address": p.get("formattedAddress", ""),
+                "lat": p.get("location", {}).get("latitude"),
+                "lng": p.get("location", {}).get("longitude"),
+                "rating": p.get("rating"),
+                "price_level": p.get("priceLevel"),
+                "types": p.get("types", []),
+                "maps_url": p.get("googleMapsUri", ""),
+            })
+
+        return {"places": places, "count": len(places)}
+
+    except Exception as e:
+        return {"error": str(e)}
