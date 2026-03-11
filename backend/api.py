@@ -302,3 +302,87 @@ def nearby_places(req: NearbyRequest):
 
     except Exception as e:
         return {"error": str(e)}
+
+# ---- Nearby-Aware Optimization ----
+class NearbyOptimizeRequest(BaseModel):
+    calorie_target: float = 2500
+    protein_min: float = 150
+    fat_min: float | None = None
+    fat_max: float | None = None
+    carb_min: float | None = None
+    carb_max: float | None = None
+    budget_max: float | None = 15.00
+    mode: str = "all"
+    nearby_names: list[str] = []  # e.g. ["Chick-fil-A", "Trader Joe's", "Whole Foods"]
+
+
+@app.post("/optimize/nearby")
+def optimize_nearby(req: NearbyOptimizeRequest):
+    """
+    Optimize using only foods from locations that are actually near the user.
+    Matches nearby place names against menu_data.json entries.
+    """
+
+    if not req.nearby_names:
+        return {"status": "error", "message": "No nearby places provided"}
+
+    # Match nearby names to our menu data
+    # Fuzzy match: if "Chick-fil-A" is nearby and menu has "Chick-fil-A: 569 Huntington Ave..."
+    matched_foods = []
+    matched_locations = set()
+
+    for food in ALL_FOODS:
+        location_full = FOOD_TO_LOCATION[food.id]
+        location_name = location_full.split(":")[0].strip().lower()
+
+        for nearby_name in req.nearby_names:
+            nearby_lower = nearby_name.strip().lower()
+            # Match if either name contains the other
+            if nearby_lower in location_name or location_name in nearby_lower:
+                matched_foods.append(food)
+                matched_locations.add(location_full.split(":")[0].strip())
+                break
+
+    if not matched_foods:
+        return {
+            "status": "no_match",
+            "message": "None of the nearby places match our menu database yet.",
+            "nearby_names": req.nearby_names,
+            "suggestion": "We have data for: " + ", ".join(
+                sorted(set(loc.split(":")[0].strip() for loc in FOOD_TO_LOCATION.values()))
+            ),
+        }
+
+    constraints = Constraints(
+        calorie_target=req.calorie_target,
+        protein_min=req.protein_min,
+        fat_min=req.fat_min,
+        fat_max=req.fat_max,
+        carb_min=req.carb_min,
+        carb_max=req.carb_max,
+        budget_max=req.budget_max,
+    )
+
+    if req.mode == "grocery":
+        matched_foods = [f for f in matched_foods if f.category == "grocery"]
+    elif req.mode == "restaurant":
+        matched_foods = [f for f in matched_foods if f.category == "restaurant"]
+
+    result = solve_meal_plan(matched_foods, constraints)
+
+    if result.status == SolverStatus.INFEASIBLE:
+        return {
+            "status": "infeasible",
+            "message": "No feasible plan from nearby places. Try increasing budget or relaxing targets.",
+            "matched_locations": list(matched_locations),
+            "matched_food_count": len(matched_foods),
+        }
+
+    plan = format_result(result, FOOD_TO_LOCATION)
+
+    return {
+        "status": "optimal",
+        "matched_locations": list(matched_locations),
+        "matched_food_count": len(matched_foods),
+        "plan": plan,
+    }

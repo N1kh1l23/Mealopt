@@ -242,6 +242,34 @@
             <button class="btn" onclick="searchNearby()" id="searchBtn">Find Nearby Food</button>
 
             <div id="map" style="display:none; margin-top: 20px;"></div>
+
+            <div id="optimizeNearbySection" style="display:none; margin-top: 20px;">
+                <div style="background:#1e293b; border:1px solid #334155; border-radius:14px; padding:20px;">
+                    <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:14px;">
+                        <div>
+                            <h3 style="color:#38bdf8; margin-bottom:4px;">Optimize from nearby places</h3>
+                            <p id="matchInfo" style="color:#64748b; font-size:0.85rem;"></p>
+                        </div>
+                    </div>
+                    <div class="input-grid" style="margin-bottom:14px;">
+                        <div class="input-group">
+                            <label>Calories</label>
+                            <input type="number" id="nearbyCal" value="2500">
+                        </div>
+                        <div class="input-group">
+                            <label>Protein (g)</label>
+                            <input type="number" id="nearbyPro" value="180">
+                        </div>
+                        <div class="input-group">
+                            <label>Budget ($)</label>
+                            <input type="number" id="nearbyBudget" value="15" step="0.5">
+                        </div>
+                    </div>
+                    <button class="btn" onclick="optimizeNearby()">Optimize With Nearby Places</button>
+                    <div id="nearbyResults" style="margin-top:20px;"></div>
+                </div>
+            </div>
+
             <div id="placesList" style="margin-top: 20px;"></div>
         </div>
     </div>
@@ -251,6 +279,7 @@
         let currentMode = "all";
         let map = null;
         let markers = [];
+        let nearbyPlaceNames = [];
 
         // ---- Page Switching ----
         function switchPage(page) {
@@ -488,6 +517,12 @@
 
                 placesList.innerHTML = html;
 
+                // Store names and show optimize section
+                nearbyPlaceNames = data.places.map(p => p.name);
+                document.getElementById('optimizeNearbySection').style.display = 'block';
+                document.getElementById('matchInfo').textContent =
+                    `${data.places.length} places found — optimizer will match against our menu database`;
+
                 // Fit map to all markers
                 const group = L.featureGroup(markers);
                 map.fitBounds(group.getBounds().pad(0.1));
@@ -498,6 +533,64 @@
 
             btn.disabled = false;
             btn.textContent = 'Find Nearby Food';
+        }
+
+        async function optimizeNearby() {
+            const nearbyResults = document.getElementById('nearbyResults');
+            nearbyResults.innerHTML = '<div class="loading"><div class="spinner"></div>Optimizing across nearby places...</div>';
+
+            const body = {
+                calorie_target: parseFloat(document.getElementById('nearbyCal').value) || 2500,
+                protein_min: parseFloat(document.getElementById('nearbyPro').value) || 180,
+                budget_max: parseFloat(document.getElementById('nearbyBudget').value) || 15,
+                nearby_names: nearbyPlaceNames,
+            };
+
+            try {
+                const res = await fetch(API + "/optimize/nearby", {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify(body),
+                });
+                const data = await res.json();
+
+                if (data.status === "optimal") {
+                    let html = `<div class="solve-badge">Matched ${data.matched_food_count} items from ${data.matched_locations.join(', ')}</div>`;
+                    // Reuse the results renderer
+                    const plan = data.plan;
+                    const groups = {};
+                    plan.items.forEach(item => {
+                        const key = item.location;
+                        if (!groups[key]) groups[key] = { address: item.address, items: [], cost: 0 };
+                        groups[key].items.push(item);
+                        groups[key].cost += item.cost;
+                    });
+
+                    html += `<div class="summary-card"><div class="summary-grid">
+                        <div><div class="stat-value">${Math.round(plan.total_calories)}</div><div class="stat-label">Calories</div></div>
+                        <div><div class="stat-value">${Math.round(plan.total_protein)}g</div><div class="stat-label">Protein</div></div>
+                        <div><div class="stat-value">${Math.round(plan.total_fat)}g</div><div class="stat-label">Fat</div></div>
+                        <div><div class="stat-value">${Math.round(plan.total_carbs)}g</div><div class="stat-label">Carbs</div></div>
+                        <div><div class="stat-value">${plan.total_cost.toFixed(2)}</div><div class="stat-label">Total Cost</div></div>
+                    </div></div>`;
+
+                    for (const [name, group] of Object.entries(groups)) {
+                        html += `<div class="location-group"><div class="location-header"><div><div class="location-name">${name}</div><div class="location-address">${group.address}</div></div><div class="location-subtotal">${group.cost.toFixed(2)}</div></div>`;
+                        group.items.forEach(item => {
+                            html += `<div class="food-row"><span class="food-servings">${item.servings.toFixed(1)}x</span><span class="food-name">${item.name}</span><span class="food-macros">${Math.round(item.protein)}g pro</span><span class="food-cost">${item.cost.toFixed(2)}</span></div>`;
+                        });
+                        html += `</div>`;
+                    }
+                    nearbyResults.innerHTML = html;
+
+                } else if (data.status === "no_match") {
+                    nearbyResults.innerHTML = `<div class="error-card"><h3>No Menu Data</h3><p>${data.message}</p><p style="margin-top:8px; font-size:0.85rem; color:#64748b;">${data.suggestion}</p></div>`;
+                } else {
+                    nearbyResults.innerHTML = `<div class="error-card"><h3>Infeasible</h3><p>${data.message}</p><p style="margin-top:8px; font-size:0.85rem; color:#64748b;">Matched ${data.matched_food_count} items from: ${data.matched_locations.join(', ')}</p></div>`;
+                }
+            } catch (err) {
+                nearbyResults.innerHTML = `<div class="error-card"><h3>Error</h3><p>${err.message}</p></div>`;
+            }
         }
     </script>
 </body>
