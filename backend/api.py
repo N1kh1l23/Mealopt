@@ -1,0 +1,230 @@
+from fastapi import FastAPI
+from fastapi.middleware.cors import CORSMiddleware
+from pydantic import BaseModel
+from solver import FoodItem, Constraints, SolverStatus, solve_meal_plan
+import json
+
+app = FastAPI(title="MealOpt API", version="0.1.0")
+
+# Allow frontend to talk to backend
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
+
+# ---- Load menu data on startup ----
+
+def load_menu_data(filepath: str = "menu_data.json"):
+    with open(filepath, "r", encoding="utf-8") as f:
+        raw = json.load(f)
+
+    foods = []
+    food_to_location = {}
+    food_id = 1
+
+    for restaurant, dishes in raw.items():
+        for dish in dishes:
+            food = FoodItem(
+                id=food_id,
+                name=dish["item"],
+                calories=dish["cal"],
+                protein=dish["pro"],
+                fat=dish["fat"],
+                carbs=dish["carb"],
+                cost=dish["price"],
+                max_servings=1.5 if dish["price"] > 4 else 3,
+                category="restaurant" if dish["price"] > 4 else "grocery",
+            )
+            foods.append(food)
+            food_to_location[food_id] = restaurant
+            food_id += 1
+
+    return foods, food_to_location
+
+
+ALL_FOODS, FOOD_TO_LOCATION = load_menu_data()
+
+
+# ---- Request/Response Models ----
+
+class PlanRequest(BaseModel):
+    calorie_target: float = 2500
+    protein_min: float = 150
+    fat_min: float | None = None
+    fat_max: float | None = None
+    carb_min: float | None = None
+    carb_max: float | None = None
+    budget_max: float | None = 15.00
+    mode: str = "all"  # "all", "grocery", "restaurant", "mix"
+
+
+class FoodItemResponse(BaseModel):
+    name: str
+    servings: float
+    calories: float
+    protein: float
+    fat: float
+    carbs: float
+    cost: float
+    location: str
+    address: str
+
+
+class PlanResponse(BaseModel):
+    status: str
+    items: list[FoodItemResponse]
+    total_calories: float
+    total_protein: float
+    total_fat: float
+    total_carbs: float
+    total_cost: float
+    cost_per_gram_protein: float
+    solver_time_ms: float
+
+
+# ---- Helper ----
+
+def format_result(result, food_to_location) -> PlanResponse:
+    items = []
+    for item in result.items:
+        loc = food_to_location[item.food.id]
+        name = loc.split(":")[0]
+        address = loc.split(": ")[1] if ": " in loc else ""
+        items.append(FoodItemResponse(
+            name=item.food.name,
+            servings=item.servings,
+            calories=item.total_calories,
+            protein=item.total_protein,
+            fat=item.total_fat,
+            carbs=item.total_carbs,
+            cost=item.total_cost,
+            location=name,
+            address=address,
+        ))
+
+    return PlanResponse(
+        status=result.status.value,
+        items=items,
+        total_calories=result.total_calories,
+        total_protein=result.total_protein,
+        total_fat=result.total_fat,
+        total_carbs=result.total_carbs,
+        total_cost=result.total_cost,
+        cost_per_gram_protein=result.cost_per_gram_protein,
+        solver_time_ms=result.solver_time_ms,
+    )
+
+
+# ---- Endpoints ----
+
+@app.get("/")
+def root():
+    return {"message": "MealOpt API is running", "foods_loaded": len(ALL_FOODS)}
+
+
+@app.get("/foods")
+def get_foods():
+    """List all available foods with their locations."""
+    result = []
+    for food in ALL_FOODS:
+        loc = FOOD_TO_LOCATION[food.id]
+        result.append({
+            "id": food.id,
+            "name": food.name,
+            "calories": food.calories,
+            "protein": food.protein,
+            "fat": food.fat,
+            "carbs": food.carbs,
+            "cost": food.cost,
+            "category": food.category,
+            "location": loc.split(":")[0],
+            "address": loc.split(": ")[1] if ": " in loc else "",
+        })
+    return result
+
+
+@app.post("/optimize", response_model=PlanResponse)
+def optimize(req: PlanRequest):
+    """Generate an optimized meal plan."""
+
+    constraints = Constraints(
+        calorie_target=req.calorie_target,
+        protein_min=req.protein_min,
+        fat_min=req.fat_min,
+        fat_max=req.fat_max,
+        carb_min=req.carb_min,
+        carb_max=req.carb_max,
+        budget_max=req.budget_max,
+    )
+
+    # Filter foods based on mode
+    if req.mode == "grocery":
+        foods = [f for f in ALL_FOODS if f.category == "grocery"]
+    elif req.mode == "restaurant":
+        foods = [f for f in ALL_FOODS if f.category == "restaurant"]
+    else:
+        foods = ALL_FOODS
+
+    result = solve_meal_plan(foods, constraints)
+
+    if result.status == SolverStatus.INFEASIBLE:
+        return PlanResponse(
+            status="infeasible",
+            items=[],
+            total_calories=0, total_protein=0, total_fat=0,
+            total_carbs=0, total_cost=0, cost_per_gram_protein=0,
+            solver_time_ms=result.solver_time_ms,
+        )
+
+    return format_result(result, FOOD_TO_LOCATION)
+
+
+@app.post("/optimize/mix")
+def optimize_mix(req: PlanRequest):
+    """Mix mode: one restaurant meal + groceries for the rest."""
+
+    # Step 1: Find best restaurant meal (~700 cal, ~40g protein)
+    restaurant_foods = [f for f in ALL_FOODS if f.category == "restaurant"]
+    restaurant_constraints = Constraints(
+        calorie_target=700,
+        protein_min=40,
+        fat_max=50,
+        budget_max=req.budget_max or 15.00,
+    )
+    restaurant_result = solve_meal_plan(restaurant_foods, restaurant_constraints)
+
+    if restaurant_result.status == SolverStatus.INFEASIBLE:
+        return {"status": "infeasible", "message": "No restaurant meal found"}
+
+    # Step 2: Fill remaining macros with groceries
+    grocery_foods = [f for f in ALL_FOODS if f.category == "grocery"]
+    remaining = Constraints(
+        calorie_target=max(req.calorie_target - restaurant_result.total_calories, 500),
+        protein_min=max(req.protein_min - restaurant_result.total_protein, 30),
+        fat_min=max((req.fat_min or 0) - restaurant_result.total_fat, 0) or None,
+        carb_max=max((req.carb_max or 500) - restaurant_result.total_carbs, 50) if req.carb_max else None,
+        budget_max=max((req.budget_max or 20) - restaurant_result.total_cost, 3),
+    )
+    grocery_result = solve_meal_plan(grocery_foods, remaining)
+
+    if grocery_result.status == SolverStatus.INFEASIBLE:
+        return {"status": "infeasible", "message": "Can't fill remaining macros with grocery budget"}
+
+    restaurant_plan = format_result(restaurant_result, FOOD_TO_LOCATION)
+    grocery_plan = format_result(grocery_result, FOOD_TO_LOCATION)
+
+    return {
+        "status": "optimal",
+        "restaurant_meal": restaurant_plan,
+        "grocery_plan": grocery_plan,
+        "combined": {
+            "total_calories": round(restaurant_result.total_calories + grocery_result.total_calories, 1),
+            "total_protein": round(restaurant_result.total_protein + grocery_result.total_protein, 1),
+            "total_fat": round(restaurant_result.total_fat + grocery_result.total_fat, 1),
+            "total_carbs": round(restaurant_result.total_carbs + grocery_result.total_carbs, 1),
+            "total_cost": round(restaurant_result.total_cost + grocery_result.total_cost, 2),
+        },
+    }

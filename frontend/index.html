@@ -1,0 +1,401 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>MealOpt</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+
+        body {
+            font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
+            background: #0f172a;
+            color: #e2e8f0;
+            min-height: 100vh;
+        }
+
+        .container { max-width: 900px; margin: 0 auto; padding: 30px 20px; }
+
+        h1 {
+            font-size: 2.2rem;
+            font-weight: 800;
+            background: linear-gradient(135deg, #38bdf8, #818cf8);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            margin-bottom: 4px;
+        }
+        .subtitle { color: #64748b; margin-bottom: 30px; font-size: 0.95rem; }
+
+        /* Mode Tabs */
+        .mode-tabs {
+            display: flex; gap: 8px; margin-bottom: 24px;
+        }
+        .mode-tab {
+            padding: 10px 20px; border-radius: 10px; border: 1px solid #334155;
+            background: #1e293b; color: #94a3b8; cursor: pointer;
+            font-size: 0.9rem; font-weight: 600; transition: all 0.2s;
+        }
+        .mode-tab:hover { border-color: #38bdf8; color: #e2e8f0; }
+        .mode-tab.active {
+            background: linear-gradient(135deg, #0ea5e9, #6366f1);
+            color: white; border-color: transparent;
+        }
+
+        /* Input Grid */
+        .input-grid {
+            display: grid; grid-template-columns: 1fr 1fr 1fr;
+            gap: 14px; margin-bottom: 24px;
+        }
+        .input-group { display: flex; flex-direction: column; gap: 5px; }
+        .input-group label {
+            font-size: 0.75rem; font-weight: 600;
+            text-transform: uppercase; letter-spacing: 0.5px; color: #64748b;
+        }
+        .input-group input {
+            padding: 12px 14px; border-radius: 10px; border: 1px solid #334155;
+            background: #1e293b; color: #e2e8f0; font-size: 1rem;
+            transition: border-color 0.2s; outline: none;
+        }
+        .input-group input:focus { border-color: #38bdf8; }
+        .input-group input::placeholder { color: #475569; }
+
+        /* Button */
+        .optimize-btn {
+            width: 100%; padding: 14px; border-radius: 12px; border: none;
+            background: linear-gradient(135deg, #0ea5e9, #6366f1);
+            color: white; font-size: 1.05rem; font-weight: 700;
+            cursor: pointer; transition: all 0.2s; letter-spacing: 0.3px;
+        }
+        .optimize-btn:hover { transform: translateY(-1px); box-shadow: 0 8px 25px rgba(14,165,233,0.3); }
+        .optimize-btn:disabled { opacity: 0.5; cursor: not-allowed; transform: none; }
+
+        /* Results */
+        .results { margin-top: 30px; }
+
+        .summary-card {
+            background: linear-gradient(135deg, #1e293b, #0f172a);
+            border: 1px solid #334155; border-radius: 16px;
+            padding: 24px; margin-bottom: 20px;
+        }
+        .summary-grid {
+            display: grid; grid-template-columns: repeat(5, 1fr); gap: 16px; text-align: center;
+        }
+        .stat-value {
+            font-size: 1.6rem; font-weight: 800;
+            background: linear-gradient(135deg, #38bdf8, #818cf8);
+            -webkit-background-clip: text; -webkit-text-fill-color: transparent;
+        }
+        .stat-label { font-size: 0.7rem; text-transform: uppercase; color: #64748b; margin-top: 2px; letter-spacing: 0.5px; }
+
+        /* Location groups */
+        .location-group {
+            background: #1e293b; border: 1px solid #334155;
+            border-radius: 14px; padding: 20px; margin-bottom: 14px;
+        }
+        .location-header {
+            display: flex; justify-content: space-between; align-items: center;
+            margin-bottom: 14px; padding-bottom: 10px; border-bottom: 1px solid #334155;
+        }
+        .location-name { font-weight: 700; font-size: 1.05rem; }
+        .location-address { font-size: 0.8rem; color: #64748b; }
+        .location-subtotal {
+            font-weight: 700; color: #34d399; font-size: 0.95rem;
+        }
+
+        .food-row {
+            display: grid; grid-template-columns: auto 1fr auto auto;
+            gap: 12px; align-items: center; padding: 8px 0;
+            border-bottom: 1px solid #1a2332;
+        }
+        .food-row:last-child { border-bottom: none; }
+        .food-servings {
+            background: #334155; padding: 3px 10px; border-radius: 6px;
+            font-weight: 700; font-size: 0.85rem; color: #38bdf8;
+        }
+        .food-name { font-weight: 500; }
+        .food-macros { font-size: 0.8rem; color: #64748b; }
+        .food-cost { font-weight: 700; color: #34d399; }
+
+        /* Loading */
+        .loading {
+            text-align: center; padding: 40px; color: #64748b;
+        }
+        .spinner {
+            width: 36px; height: 36px; border: 3px solid #334155;
+            border-top-color: #38bdf8; border-radius: 50%;
+            animation: spin 0.8s linear infinite; margin: 0 auto 12px;
+        }
+        @keyframes spin { to { transform: rotate(360deg); } }
+
+        /* Error */
+        .error-card {
+            background: #1e293b; border: 1px solid #ef4444; border-radius: 14px;
+            padding: 24px; text-align: center;
+        }
+        .error-card h3 { color: #ef4444; margin-bottom: 8px; }
+        .error-card p { color: #94a3b8; font-size: 0.9rem; }
+
+        /* Solve time badge */
+        .solve-badge {
+            display: inline-block; background: #334155; padding: 4px 12px;
+            border-radius: 20px; font-size: 0.75rem; color: #94a3b8; margin-bottom: 16px;
+        }
+
+        @media (max-width: 600px) {
+            .input-grid { grid-template-columns: 1fr 1fr; }
+            .summary-grid { grid-template-columns: repeat(3, 1fr); }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>MealOpt</h1>
+        <p class="subtitle">AI-powered macro & budget meal optimizer</p>
+
+        <!-- Mode Selector -->
+        <div class="mode-tabs">
+            <div class="mode-tab active" data-mode="all" onclick="setMode(this)">All Sources</div>
+            <div class="mode-tab" data-mode="grocery" onclick="setMode(this)">Grocery Only</div>
+            <div class="mode-tab" data-mode="restaurant" onclick="setMode(this)">Restaurants</div>
+            <div class="mode-tab" data-mode="mix" onclick="setMode(this)">Mix Mode</div>
+        </div>
+
+        <!-- Inputs -->
+        <div class="input-grid">
+            <div class="input-group">
+                <label>Calories</label>
+                <input type="number" id="calories" value="2500" placeholder="2500">
+            </div>
+            <div class="input-group">
+                <label>Protein (g)</label>
+                <input type="number" id="protein" value="180" placeholder="180">
+            </div>
+            <div class="input-group">
+                <label>Budget ($)</label>
+                <input type="number" id="budget" value="15" step="0.5" placeholder="15">
+            </div>
+            <div class="input-group">
+                <label>Fat Min (g)</label>
+                <input type="number" id="fatMin" placeholder="optional">
+            </div>
+            <div class="input-group">
+                <label>Fat Max (g)</label>
+                <input type="number" id="fatMax" placeholder="optional">
+            </div>
+            <div class="input-group">
+                <label>Carb Max (g)</label>
+                <input type="number" id="carbMax" placeholder="optional">
+            </div>
+        </div>
+
+        <button class="optimize-btn" onclick="optimize()">Optimize My Meals</button>
+
+        <div id="results" class="results"></div>
+    </div>
+
+    <script>
+        const API = "http://127.0.0.1:8000";
+        let currentMode = "all";
+
+        function setMode(el) {
+            document.querySelectorAll('.mode-tab').forEach(t => t.classList.remove('active'));
+            el.classList.add('active');
+            currentMode = el.dataset.mode;
+        }
+
+        function getVal(id) {
+            const v = document.getElementById(id).value;
+            return v === "" ? null : parseFloat(v);
+        }
+
+        async function optimize() {
+            const results = document.getElementById('results');
+            results.innerHTML = '<div class="loading"><div class="spinner"></div>Optimizing...</div>';
+
+            const body = {
+                calorie_target: getVal('calories') || 2500,
+                protein_min: getVal('protein') || 150,
+                budget_max: getVal('budget') || 15,
+                fat_min: getVal('fatMin'),
+                fat_max: getVal('fatMax'),
+                carb_max: getVal('carbMax'),
+                mode: currentMode,
+            };
+
+            try {
+                const endpoint = currentMode === "mix" ? "/optimize/mix" : "/optimize";
+                const res = await fetch(API + endpoint, {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify(body),
+                });
+                const data = await res.json();
+
+                if (currentMode === "mix") {
+                    renderMixResults(data);
+                } else {
+                    renderResults(data);
+                }
+            } catch (err) {
+                results.innerHTML = `
+                    <div class="error-card">
+                        <h3>Connection Error</h3>
+                        <p>Make sure the backend is running (python -m uvicorn api:app --reload)</p>
+                    </div>`;
+            }
+        }
+
+        function renderResults(data) {
+            const results = document.getElementById('results');
+
+            if (data.status === "infeasible") {
+                results.innerHTML = `
+                    <div class="error-card">
+                        <h3>No Feasible Plan Found</h3>
+                        <p>Try increasing your budget, lowering protein, or removing macro restrictions.</p>
+                    </div>`;
+                return;
+            }
+
+            // Group by location
+            const groups = {};
+            data.items.forEach(item => {
+                const key = item.location;
+                if (!groups[key]) groups[key] = { address: item.address, items: [], cost: 0 };
+                groups[key].items.push(item);
+                groups[key].cost += item.cost;
+            });
+
+            let html = `
+                <div class="solve-badge">Solved in ${data.solver_time_ms}ms</div>
+                <div class="summary-card">
+                    <div class="summary-grid">
+                        <div><div class="stat-value">${Math.round(data.total_calories)}</div><div class="stat-label">Calories</div></div>
+                        <div><div class="stat-value">${Math.round(data.total_protein)}g</div><div class="stat-label">Protein</div></div>
+                        <div><div class="stat-value">${Math.round(data.total_fat)}g</div><div class="stat-label">Fat</div></div>
+                        <div><div class="stat-value">${Math.round(data.total_carbs)}g</div><div class="stat-label">Carbs</div></div>
+                        <div><div class="stat-value">$${data.total_cost.toFixed(2)}</div><div class="stat-label">Total Cost</div></div>
+                    </div>
+                </div>`;
+
+            for (const [name, group] of Object.entries(groups)) {
+                html += `
+                    <div class="location-group">
+                        <div class="location-header">
+                            <div>
+                                <div class="location-name">${name}</div>
+                                <div class="location-address">${group.address}</div>
+                            </div>
+                            <div class="location-subtotal">$${group.cost.toFixed(2)}</div>
+                        </div>`;
+
+                group.items.forEach(item => {
+                    html += `
+                        <div class="food-row">
+                            <span class="food-servings">${item.servings.toFixed(1)}x</span>
+                            <span class="food-name">${item.name}</span>
+                            <span class="food-macros">${Math.round(item.protein)}g pro</span>
+                            <span class="food-cost">$${item.cost.toFixed(2)}</span>
+                        </div>`;
+                });
+
+                html += `</div>`;
+            }
+
+            results.innerHTML = html;
+        }
+
+        function renderMixResults(data) {
+            const results = document.getElementById('results');
+
+            if (data.status === "infeasible") {
+                results.innerHTML = `
+                    <div class="error-card">
+                        <h3>${data.message || "No feasible plan found"}</h3>
+                        <p>Try adjusting your constraints.</p>
+                    </div>`;
+                return;
+            }
+
+            let html = `
+                <div class="summary-card">
+                    <div class="summary-grid">
+                        <div><div class="stat-value">${Math.round(data.combined.total_calories)}</div><div class="stat-label">Calories</div></div>
+                        <div><div class="stat-value">${Math.round(data.combined.total_protein)}g</div><div class="stat-label">Protein</div></div>
+                        <div><div class="stat-value">${Math.round(data.combined.total_fat)}g</div><div class="stat-label">Fat</div></div>
+                        <div><div class="stat-value">${Math.round(data.combined.total_carbs)}g</div><div class="stat-label">Carbs</div></div>
+                        <div><div class="stat-value">$${data.combined.total_cost.toFixed(2)}</div><div class="stat-label">Total Cost</div></div>
+                    </div>
+                </div>
+
+                <h3 style="color: #38bdf8; margin-bottom: 12px;">🍔 Restaurant Meal</h3>`;
+
+            // Restaurant items
+            const rGroups = {};
+            data.restaurant_meal.items.forEach(item => {
+                const key = item.location;
+                if (!rGroups[key]) rGroups[key] = { address: item.address, items: [], cost: 0 };
+                rGroups[key].items.push(item);
+                rGroups[key].cost += item.cost;
+            });
+
+            for (const [name, group] of Object.entries(rGroups)) {
+                html += `
+                    <div class="location-group">
+                        <div class="location-header">
+                            <div>
+                                <div class="location-name">${name}</div>
+                                <div class="location-address">${group.address}</div>
+                            </div>
+                            <div class="location-subtotal">$${group.cost.toFixed(2)}</div>
+                        </div>`;
+                group.items.forEach(item => {
+                    html += `
+                        <div class="food-row">
+                            <span class="food-servings">${item.servings.toFixed(1)}x</span>
+                            <span class="food-name">${item.name}</span>
+                            <span class="food-macros">${Math.round(item.protein)}g pro</span>
+                            <span class="food-cost">$${item.cost.toFixed(2)}</span>
+                        </div>`;
+                });
+                html += `</div>`;
+            }
+
+            html += `<h3 style="color: #34d399; margin: 20px 0 12px;">🥦 Groceries for the Rest</h3>`;
+
+            // Grocery items
+            const gGroups = {};
+            data.grocery_plan.items.forEach(item => {
+                const key = item.location;
+                if (!gGroups[key]) gGroups[key] = { address: item.address, items: [], cost: 0 };
+                gGroups[key].items.push(item);
+                gGroups[key].cost += item.cost;
+            });
+
+            for (const [name, group] of Object.entries(gGroups)) {
+                html += `
+                    <div class="location-group">
+                        <div class="location-header">
+                            <div>
+                                <div class="location-name">${name}</div>
+                                <div class="location-address">${group.address}</div>
+                            </div>
+                            <div class="location-subtotal">$${group.cost.toFixed(2)}</div>
+                        </div>`;
+                group.items.forEach(item => {
+                    html += `
+                        <div class="food-row">
+                            <span class="food-servings">${item.servings.toFixed(1)}x</span>
+                            <span class="food-name">${item.name}</span>
+                            <span class="food-macros">${Math.round(item.protein)}g pro</span>
+                            <span class="food-cost">$${item.cost.toFixed(2)}</span>
+                        </div>`;
+                });
+                html += `</div>`;
+            }
+
+            results.innerHTML = html;
+        }
+    </script>
+</body>
+</html>
