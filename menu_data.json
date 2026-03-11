@@ -1,0 +1,63 @@
+{
+  "Chipotle: 1100 Boylston St, Boston, MA": [
+    {"item": "Chicken Burrito Bowl", "cal": 740, "pro": 53, "fat": 22, "carb": 83, "price": 10.75},
+    {"item": "Steak Burrito Bowl", "cal": 770, "pro": 51, "fat": 24, "carb": 83, "price": 11.50},
+    {"item": "Chicken Salad Bowl", "cal": 510, "pro": 48, "fat": 19, "carb": 35, "price": 10.75},
+    {"item": "Sofritas Bowl", "cal": 675, "pro": 27, "fat": 25, "carb": 83, "price": 9.50}
+  ],
+  "Chick-fil-A: 569 Huntington Ave, Boston, MA": [
+    {"item": "Grilled Nuggets (12ct)", "cal": 200, "pro": 38, "fat": 4, "carb": 1, "price": 6.29},
+    {"item": "Spicy Deluxe Sandwich", "cal": 550, "pro": 35, "fat": 26, "carb": 48, "price": 7.19},
+    {"item": "Grilled Chicken Sandwich", "cal": 390, "pro": 40, "fat": 12, "carb": 33, "price": 6.89},
+    {"item": "Cobb Salad", "cal": 510, "pro": 40, "fat": 27, "carb": 27, "price": 9.39}
+  ],
+  "Sweetgreen: 659 Tremont St, Boston, MA": [
+    {"item": "Harvest Bowl", "cal": 705, "pro": 30, "fat": 37, "carb": 63, "price": 15.25},
+    {"item": "Chicken Pesto Parm", "cal": 620, "pro": 43, "fat": 28, "carb": 50, "price": 15.75},
+    {"item": "Buffalo Chicken Bowl", "cal": 575, "pro": 42, "fat": 22, "carb": 52, "price": 15.25}
+  ],
+  "Cava: 1 Brookline Pl, Brookline, MA": [
+    {"item": "Grilled Chicken Bowl", "cal": 620, "pro": 48, "fat": 18, "carb": 65, "price": 11.95},
+    {"item": "Lamb Bowl", "cal": 710, "pro": 42, "fat": 28, "carb": 65, "price": 12.95},
+    {"item": "Falafel Bowl", "cal": 680, "pro": 22, "fat": 30, "carb": 78, "price": 10.95}
+  ],
+  "Walmart Supercenter: 100 Cambridgeside Pl, Cambridge, MA": [
+    {"item": "Chicken Breast (6oz)", "cal": 280, "pro": 53, "fat": 6, "carb": 0, "price": 2.50},
+    {"item": "Eggs (dozen)", "cal": 858, "pro": 75.6, "fat": 57, "carb": 4.2, "price": 3.60},
+    {"item": "White Rice (1lb dry)", "cal": 1650, "pro": 34, "fat": 3, "carb": 356, "price": 1.20},
+    {"item": "Peanut Butter (2 tbsp)", "cal": 188, "pro": 8, "fat": 16, "carb": 6, "price": 0.30},
+    {"item": "Whey Protein (1 scoop)", "cal": 120, "pro": 24, "fat": 1.5, "carb": 3, "price": 0.80},
+    {"item": "Oats (1 cup dry)", "cal": 307, "pro": 10.7, "fat": 5.3, "carb": 54.8, "price": 0.35},
+    {"item": "Black Beans (1 cup)", "cal": 227, "pro": 15.2, "fat": 0.9, "carb": 40.8, "price": 0.45},
+    {"item": "Banana (1 medium)", "cal": 105, "pro": 1.3, "fat": 0.4, "carb": 27, "price": 0.25},
+    {"item": "Whole Milk (1 cup)", "cal": 149, "pro": 8, "fat": 8, "carb": 12, "price": 0.50}
+  ],
+  "Trader Joe's: 1317 Beacon St, Brookline, MA": [
+    {"item": "Chicken Breast (6oz)", "cal": 280, "pro": 53, "fat": 6, "carb": 0, "price": 2.80},
+    {"item": "Turkey Meatballs (5pc)", "cal": 200, "pro": 22, "fat": 10, "carb": 6, "price": 1.50},
+    {"item": "Greek Yogurt (1 cup)", "cal": 130, "pro": 22, "fat": 0.7, "carb": 9, "price": 1.10},
+    {"item": "Frozen Brown Rice (1 cup)", "cal": 220, "pro": 5, "fat": 2, "carb": 46, "price": 0.60},
+    {"item": "Lentils (1 cup cooked)", "cal": 230, "pro": 17.9, "fat": 0.8, "carb": 39.9, "price": 0.45}
+  ],
+  "Stop & Shop: 1100 Massachusetts Ave, Cambridge, MA": [
+    {"item": "Ground Turkey 93% (6oz)", "cal": 250, "pro": 38, "fat": 10, "carb": 0, "price": 2.40},
+    {"item": "Cottage Cheese (1 cup)", "cal": 220, "pro": 25, "fat": 9, "carb": 8, "price": 1.60},
+    {"item": "Frozen Mixed Veggies (1 cup)", "cal": 80, "pro": 4, "fat": 0.5, "carb": 15, "price": 0.55},
+    {"item": "Canned Tuna (1 can)", "cal": 120, "pro": 27, "fat": 1, "carb": 0, "price": 1.30},
+    {"item": "Sweet Potato (1 medium)", "cal": 103, "pro": 2.3, "fat": 0.1, "carb": 24, "price": 0.80}
+  ],
+  "Popeyes: 874 Commonwealth Ave, Boston, MA": [
+    {"item": "Blackened Chicken Tenders (5pc)", "cal": 340, "pro": 50, "fat": 7, "carb": 14, "price": 7.99},
+    {"item": "Red Beans & Rice (reg)", "cal": 230, "pro": 9, "fat": 6, "carb": 36, "price": 2.49},
+    {"item": "Signature Chicken Sandwich", "cal": 700, "pro": 35, "fat": 42, "carb": 50, "price": 5.99}
+  ],
+  "Subway: 1246 Mass Ave, Cambridge, MA": [
+    {"item": "Turkey Breast Sub (6in)", "cal": 270, "pro": 20, "fat": 3.5, "carb": 40, "price": 6.49},
+    {"item": "Chicken Teriyaki Sub (6in)", "cal": 340, "pro": 26, "fat": 5, "carb": 49, "price": 7.29},
+    {"item": "Rotisserie Chicken Sub (6in)", "cal": 310, "pro": 28, "fat": 6, "carb": 38, "price": 6.99}
+  ],
+  "Five Guys: 1 Brookline Pl, Brookline, MA": [
+    {"item": "Little Hamburger", "cal": 480, "pro": 27, "fat": 26, "carb": 39, "price": 8.49},
+    {"item": "Bunless Bacon Cheeseburger", "cal": 570, "pro": 42, "fat": 40, "carb": 3, "price": 12.69}
+  ]
+}
