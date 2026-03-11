@@ -4,32 +4,37 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>MealOpt</title>
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
     <style>
         * { margin: 0; padding: 0; box-sizing: border-box; }
-
         body {
             font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
-            background: #0f172a;
-            color: #e2e8f0;
-            min-height: 100vh;
+            background: #0f172a; color: #e2e8f0; min-height: 100vh;
         }
-
         .container { max-width: 900px; margin: 0 auto; padding: 30px 20px; }
-
         h1 {
-            font-size: 2.2rem;
-            font-weight: 800;
+            font-size: 2.2rem; font-weight: 800;
             background: linear-gradient(135deg, #38bdf8, #818cf8);
-            -webkit-background-clip: text;
-            -webkit-text-fill-color: transparent;
+            -webkit-background-clip: text; -webkit-text-fill-color: transparent;
             margin-bottom: 4px;
         }
         .subtitle { color: #64748b; margin-bottom: 30px; font-size: 0.95rem; }
 
-        /* Mode Tabs */
-        .mode-tabs {
-            display: flex; gap: 8px; margin-bottom: 24px;
+        /* Page Tabs */
+        .page-tabs { display: flex; gap: 8px; margin-bottom: 24px; }
+        .page-tab {
+            padding: 10px 24px; border-radius: 10px; border: 2px solid #334155;
+            background: #1e293b; color: #94a3b8; cursor: pointer;
+            font-size: 0.95rem; font-weight: 700; transition: all 0.2s;
         }
+        .page-tab:hover { border-color: #38bdf8; color: #e2e8f0; }
+        .page-tab.active { background: #0f172a; border-color: #38bdf8; color: #38bdf8; }
+        .page { display: none; }
+        .page.active { display: block; }
+
+        /* Mode Tabs */
+        .mode-tabs { display: flex; gap: 8px; margin-bottom: 24px; }
         .mode-tab {
             padding: 10px 20px; border-radius: 10px; border: 1px solid #334155;
             background: #1e293b; color: #94a3b8; cursor: pointer;
@@ -42,34 +47,29 @@
         }
 
         /* Input Grid */
-        .input-grid {
-            display: grid; grid-template-columns: 1fr 1fr 1fr;
-            gap: 14px; margin-bottom: 24px;
-        }
+        .input-grid { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 14px; margin-bottom: 24px; }
         .input-group { display: flex; flex-direction: column; gap: 5px; }
         .input-group label {
             font-size: 0.75rem; font-weight: 600;
             text-transform: uppercase; letter-spacing: 0.5px; color: #64748b;
         }
-        .input-group input {
+        .input-group input, .input-group select {
             padding: 12px 14px; border-radius: 10px; border: 1px solid #334155;
             background: #1e293b; color: #e2e8f0; font-size: 1rem;
             transition: border-color 0.2s; outline: none;
         }
-        .input-group input:focus { border-color: #38bdf8; }
+        .input-group input:focus, .input-group select:focus { border-color: #38bdf8; }
         .input-group input::placeholder { color: #475569; }
 
-        /* Button */
-        .optimize-btn {
+        .btn {
             width: 100%; padding: 14px; border-radius: 12px; border: none;
             background: linear-gradient(135deg, #0ea5e9, #6366f1);
             color: white; font-size: 1.05rem; font-weight: 700;
             cursor: pointer; transition: all 0.2s; letter-spacing: 0.3px;
         }
-        .optimize-btn:hover { transform: translateY(-1px); box-shadow: 0 8px 25px rgba(14,165,233,0.3); }
-        .optimize-btn:disabled { opacity: 0.5; cursor: not-allowed; transform: none; }
+        .btn:hover { transform: translateY(-1px); box-shadow: 0 8px 25px rgba(14,165,233,0.3); }
+        .btn:disabled { opacity: 0.5; cursor: not-allowed; transform: none; }
 
-        /* Results */
         .results { margin-top: 30px; }
 
         .summary-card {
@@ -77,9 +77,7 @@
             border: 1px solid #334155; border-radius: 16px;
             padding: 24px; margin-bottom: 20px;
         }
-        .summary-grid {
-            display: grid; grid-template-columns: repeat(5, 1fr); gap: 16px; text-align: center;
-        }
+        .summary-grid { display: grid; grid-template-columns: repeat(5, 1fr); gap: 16px; text-align: center; }
         .stat-value {
             font-size: 1.6rem; font-weight: 800;
             background: linear-gradient(135deg, #38bdf8, #818cf8);
@@ -87,7 +85,6 @@
         }
         .stat-label { font-size: 0.7rem; text-transform: uppercase; color: #64748b; margin-top: 2px; letter-spacing: 0.5px; }
 
-        /* Location groups */
         .location-group {
             background: #1e293b; border: 1px solid #334155;
             border-radius: 14px; padding: 20px; margin-bottom: 14px;
@@ -98,9 +95,7 @@
         }
         .location-name { font-weight: 700; font-size: 1.05rem; }
         .location-address { font-size: 0.8rem; color: #64748b; }
-        .location-subtotal {
-            font-weight: 700; color: #34d399; font-size: 0.95rem;
-        }
+        .location-subtotal { font-weight: 700; color: #34d399; font-size: 0.95rem; }
 
         .food-row {
             display: grid; grid-template-columns: auto 1fr auto auto;
@@ -116,10 +111,7 @@
         .food-macros { font-size: 0.8rem; color: #64748b; }
         .food-cost { font-weight: 700; color: #34d399; }
 
-        /* Loading */
-        .loading {
-            text-align: center; padding: 40px; color: #64748b;
-        }
+        .loading { text-align: center; padding: 40px; color: #64748b; }
         .spinner {
             width: 36px; height: 36px; border: 3px solid #334155;
             border-top-color: #38bdf8; border-radius: 50%;
@@ -127,7 +119,6 @@
         }
         @keyframes spin { to { transform: rotate(360deg); } }
 
-        /* Error */
         .error-card {
             background: #1e293b; border: 1px solid #ef4444; border-radius: 14px;
             padding: 24px; text-align: center;
@@ -135,15 +126,46 @@
         .error-card h3 { color: #ef4444; margin-bottom: 8px; }
         .error-card p { color: #94a3b8; font-size: 0.9rem; }
 
-        /* Solve time badge */
         .solve-badge {
             display: inline-block; background: #334155; padding: 4px 12px;
             border-radius: 20px; font-size: 0.75rem; color: #94a3b8; margin-bottom: 16px;
         }
 
+        /* Map */
+        #map {
+            width: 100%; height: 500px; border-radius: 14px;
+            border: 1px solid #334155; margin-bottom: 20px;
+        }
+
+        /* Place cards */
+        .place-card {
+            background: #1e293b; border: 1px solid #334155;
+            border-radius: 12px; padding: 16px; margin-bottom: 10px;
+            display: flex; justify-content: space-between; align-items: center;
+            transition: border-color 0.2s; cursor: pointer;
+        }
+        .place-card:hover { border-color: #38bdf8; }
+        .place-name { font-weight: 700; font-size: 1rem; }
+        .place-address { font-size: 0.8rem; color: #64748b; margin-top: 2px; }
+        .place-meta { text-align: right; }
+        .place-rating { color: #fbbf24; font-weight: 700; }
+        .place-price { font-size: 0.8rem; color: #64748b; }
+        .place-type-badge {
+            display: inline-block; padding: 2px 8px; border-radius: 6px;
+            font-size: 0.7rem; font-weight: 600; margin-top: 4px;
+        }
+        .badge-grocery { background: #064e3b; color: #34d399; }
+        .badge-restaurant { background: #1e1b4b; color: #818cf8; }
+
+        .maps-link {
+            color: #38bdf8; text-decoration: none; font-size: 0.8rem; font-weight: 600;
+        }
+        .maps-link:hover { text-decoration: underline; }
+
         @media (max-width: 600px) {
             .input-grid { grid-template-columns: 1fr 1fr; }
             .summary-grid { grid-template-columns: repeat(3, 1fr); }
+            #map { height: 350px; }
         }
     </style>
 </head>
@@ -152,51 +174,109 @@
         <h1>MealOpt</h1>
         <p class="subtitle">AI-powered macro & budget meal optimizer</p>
 
-        <!-- Mode Selector -->
-        <div class="mode-tabs">
-            <div class="mode-tab active" data-mode="all" onclick="setMode(this)">All Sources</div>
-            <div class="mode-tab" data-mode="grocery" onclick="setMode(this)">Grocery Only</div>
-            <div class="mode-tab" data-mode="restaurant" onclick="setMode(this)">Restaurants</div>
-            <div class="mode-tab" data-mode="mix" onclick="setMode(this)">Mix Mode</div>
+        <!-- Page Tabs -->
+        <div class="page-tabs">
+            <div class="page-tab active" onclick="switchPage('optimizer')">Optimizer</div>
+            <div class="page-tab" onclick="switchPage('nearby')">Nearby Food</div>
         </div>
 
-        <!-- Inputs -->
-        <div class="input-grid">
-            <div class="input-group">
-                <label>Calories</label>
-                <input type="number" id="calories" value="2500" placeholder="2500">
+        <!-- OPTIMIZER PAGE -->
+        <div id="page-optimizer" class="page active">
+            <div class="mode-tabs">
+                <div class="mode-tab active" data-mode="all" onclick="setMode(this)">All Sources</div>
+                <div class="mode-tab" data-mode="grocery" onclick="setMode(this)">Grocery Only</div>
+                <div class="mode-tab" data-mode="restaurant" onclick="setMode(this)">Restaurants</div>
+                <div class="mode-tab" data-mode="mix" onclick="setMode(this)">Mix Mode</div>
             </div>
-            <div class="input-group">
-                <label>Protein (g)</label>
-                <input type="number" id="protein" value="180" placeholder="180">
+
+            <div class="input-grid">
+                <div class="input-group">
+                    <label>Calories</label>
+                    <input type="number" id="calories" value="2500" placeholder="2500">
+                </div>
+                <div class="input-group">
+                    <label>Protein (g)</label>
+                    <input type="number" id="protein" value="180" placeholder="180">
+                </div>
+                <div class="input-group">
+                    <label>Budget ($)</label>
+                    <input type="number" id="budget" value="15" step="0.5" placeholder="15">
+                </div>
+                <div class="input-group">
+                    <label>Fat Min (g)</label>
+                    <input type="number" id="fatMin" placeholder="optional">
+                </div>
+                <div class="input-group">
+                    <label>Fat Max (g)</label>
+                    <input type="number" id="fatMax" placeholder="optional">
+                </div>
+                <div class="input-group">
+                    <label>Carb Max (g)</label>
+                    <input type="number" id="carbMax" placeholder="optional">
+                </div>
             </div>
-            <div class="input-group">
-                <label>Budget ($)</label>
-                <input type="number" id="budget" value="15" step="0.5" placeholder="15">
-            </div>
-            <div class="input-group">
-                <label>Fat Min (g)</label>
-                <input type="number" id="fatMin" placeholder="optional">
-            </div>
-            <div class="input-group">
-                <label>Fat Max (g)</label>
-                <input type="number" id="fatMax" placeholder="optional">
-            </div>
-            <div class="input-group">
-                <label>Carb Max (g)</label>
-                <input type="number" id="carbMax" placeholder="optional">
-            </div>
+            <button class="btn" onclick="optimize()">Optimize My Meals</button>
+            <div id="results" class="results"></div>
         </div>
 
-        <button class="optimize-btn" onclick="optimize()">Optimize My Meals</button>
+        <!-- NEARBY PAGE -->
+        <div id="page-nearby" class="page">
+            <div class="input-grid" style="grid-template-columns: 1fr 1fr 1fr;">
+                <div class="input-group">
+                    <label>Location</label>
+                    <input type="text" id="locationInput" placeholder="Enter address or zip code">
+                </div>
+                <div class="input-group">
+                    <label>Radius (miles)</label>
+                    <input type="number" id="radiusInput" value="1" step="0.5" placeholder="1">
+                </div>
+                <div class="input-group">
+                    <label>Type</label>
+                    <select id="typeInput">
+                        <option value="all">All Food Places</option>
+                        <option value="restaurant">Restaurants Only</option>
+                        <option value="grocery">Grocery Stores Only</option>
+                    </select>
+                </div>
+            </div>
+            <button class="btn" onclick="searchNearby()" id="searchBtn">Find Nearby Food</button>
 
-        <div id="results" class="results"></div>
+            <div id="map" style="display:none; margin-top: 20px;"></div>
+            <div id="placesList" style="margin-top: 20px;"></div>
+        </div>
     </div>
 
     <script>
         const API = "http://127.0.0.1:8000";
         let currentMode = "all";
+        let map = null;
+        let markers = [];
 
+        // ---- Page Switching ----
+        function switchPage(page) {
+            document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
+            document.querySelectorAll('.page-tab').forEach(t => t.classList.remove('active'));
+            document.getElementById('page-' + page).classList.add('active');
+            event.target.classList.add('active');
+
+            if (page === 'nearby' && !map) {
+                setTimeout(() => {
+                    document.getElementById('map').style.display = 'block';
+                    map = L.map('map').setView([42.3398, -71.0892], 14);
+                    L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
+                        attribution: '&copy; OpenStreetMap &copy; CARTO',
+                        maxZoom: 19,
+                    }).addTo(map);
+                    // Add user marker
+                    L.circleMarker([42.3398, -71.0892], {
+                        radius: 8, fillColor: '#38bdf8', color: '#fff',
+                        weight: 2, fillOpacity: 1,
+                    }).addTo(map).bindPopup('<b>Northeastern University</b>');
+                }, 100);
+            }
+        }
+
+        // ---- Optimizer ----
         function setMode(el) {
             document.querySelectorAll('.mode-tab').forEach(t => t.classList.remove('active'));
             el.classList.add('active');
@@ -230,34 +310,19 @@
                     body: JSON.stringify(body),
                 });
                 const data = await res.json();
-
-                if (currentMode === "mix") {
-                    renderMixResults(data);
-                } else {
-                    renderResults(data);
-                }
+                if (currentMode === "mix") renderMixResults(data);
+                else renderResults(data);
             } catch (err) {
-                results.innerHTML = `
-                    <div class="error-card">
-                        <h3>Connection Error</h3>
-                        <p>Make sure the backend is running (python -m uvicorn api:app --reload)</p>
-                    </div>`;
+                results.innerHTML = `<div class="error-card"><h3>Connection Error</h3><p>Make sure the backend is running</p></div>`;
             }
         }
 
         function renderResults(data) {
             const results = document.getElementById('results');
-
             if (data.status === "infeasible") {
-                results.innerHTML = `
-                    <div class="error-card">
-                        <h3>No Feasible Plan Found</h3>
-                        <p>Try increasing your budget, lowering protein, or removing macro restrictions.</p>
-                    </div>`;
+                results.innerHTML = `<div class="error-card"><h3>No Feasible Plan Found</h3><p>Try increasing your budget, lowering protein, or removing macro restrictions.</p></div>`;
                 return;
             }
-
-            // Group by location
             const groups = {};
             data.items.forEach(item => {
                 const key = item.location;
@@ -265,136 +330,174 @@
                 groups[key].items.push(item);
                 groups[key].cost += item.cost;
             });
-
             let html = `
                 <div class="solve-badge">Solved in ${data.solver_time_ms}ms</div>
-                <div class="summary-card">
-                    <div class="summary-grid">
-                        <div><div class="stat-value">${Math.round(data.total_calories)}</div><div class="stat-label">Calories</div></div>
-                        <div><div class="stat-value">${Math.round(data.total_protein)}g</div><div class="stat-label">Protein</div></div>
-                        <div><div class="stat-value">${Math.round(data.total_fat)}g</div><div class="stat-label">Fat</div></div>
-                        <div><div class="stat-value">${Math.round(data.total_carbs)}g</div><div class="stat-label">Carbs</div></div>
-                        <div><div class="stat-value">$${data.total_cost.toFixed(2)}</div><div class="stat-label">Total Cost</div></div>
-                    </div>
-                </div>`;
-
+                <div class="summary-card"><div class="summary-grid">
+                    <div><div class="stat-value">${Math.round(data.total_calories)}</div><div class="stat-label">Calories</div></div>
+                    <div><div class="stat-value">${Math.round(data.total_protein)}g</div><div class="stat-label">Protein</div></div>
+                    <div><div class="stat-value">${Math.round(data.total_fat)}g</div><div class="stat-label">Fat</div></div>
+                    <div><div class="stat-value">${Math.round(data.total_carbs)}g</div><div class="stat-label">Carbs</div></div>
+                    <div><div class="stat-value">$${data.total_cost.toFixed(2)}</div><div class="stat-label">Total Cost</div></div>
+                </div></div>`;
             for (const [name, group] of Object.entries(groups)) {
-                html += `
-                    <div class="location-group">
-                        <div class="location-header">
-                            <div>
-                                <div class="location-name">${name}</div>
-                                <div class="location-address">${group.address}</div>
-                            </div>
-                            <div class="location-subtotal">$${group.cost.toFixed(2)}</div>
-                        </div>`;
-
+                html += `<div class="location-group"><div class="location-header"><div><div class="location-name">${name}</div><div class="location-address">${group.address}</div></div><div class="location-subtotal">$${group.cost.toFixed(2)}</div></div>`;
                 group.items.forEach(item => {
-                    html += `
-                        <div class="food-row">
-                            <span class="food-servings">${item.servings.toFixed(1)}x</span>
-                            <span class="food-name">${item.name}</span>
-                            <span class="food-macros">${Math.round(item.protein)}g pro</span>
-                            <span class="food-cost">$${item.cost.toFixed(2)}</span>
-                        </div>`;
+                    html += `<div class="food-row"><span class="food-servings">${item.servings.toFixed(1)}x</span><span class="food-name">${item.name}</span><span class="food-macros">${Math.round(item.protein)}g pro</span><span class="food-cost">$${item.cost.toFixed(2)}</span></div>`;
                 });
-
                 html += `</div>`;
             }
-
             results.innerHTML = html;
         }
 
         function renderMixResults(data) {
             const results = document.getElementById('results');
-
             if (data.status === "infeasible") {
-                results.innerHTML = `
-                    <div class="error-card">
-                        <h3>${data.message || "No feasible plan found"}</h3>
-                        <p>Try adjusting your constraints.</p>
-                    </div>`;
+                results.innerHTML = `<div class="error-card"><h3>${data.message || "No feasible plan found"}</h3><p>Try adjusting your constraints.</p></div>`;
                 return;
             }
-
             let html = `
-                <div class="summary-card">
-                    <div class="summary-grid">
-                        <div><div class="stat-value">${Math.round(data.combined.total_calories)}</div><div class="stat-label">Calories</div></div>
-                        <div><div class="stat-value">${Math.round(data.combined.total_protein)}g</div><div class="stat-label">Protein</div></div>
-                        <div><div class="stat-value">${Math.round(data.combined.total_fat)}g</div><div class="stat-label">Fat</div></div>
-                        <div><div class="stat-value">${Math.round(data.combined.total_carbs)}g</div><div class="stat-label">Carbs</div></div>
-                        <div><div class="stat-value">$${data.combined.total_cost.toFixed(2)}</div><div class="stat-label">Total Cost</div></div>
-                    </div>
-                </div>
-
-                <h3 style="color: #38bdf8; margin-bottom: 12px;">🍔 Restaurant Meal</h3>`;
-
-            // Restaurant items
-            const rGroups = {};
-            data.restaurant_meal.items.forEach(item => {
-                const key = item.location;
-                if (!rGroups[key]) rGroups[key] = { address: item.address, items: [], cost: 0 };
-                rGroups[key].items.push(item);
-                rGroups[key].cost += item.cost;
-            });
-
-            for (const [name, group] of Object.entries(rGroups)) {
-                html += `
-                    <div class="location-group">
-                        <div class="location-header">
-                            <div>
-                                <div class="location-name">${name}</div>
-                                <div class="location-address">${group.address}</div>
-                            </div>
-                            <div class="location-subtotal">$${group.cost.toFixed(2)}</div>
-                        </div>`;
-                group.items.forEach(item => {
-                    html += `
-                        <div class="food-row">
-                            <span class="food-servings">${item.servings.toFixed(1)}x</span>
-                            <span class="food-name">${item.name}</span>
-                            <span class="food-macros">${Math.round(item.protein)}g pro</span>
-                            <span class="food-cost">$${item.cost.toFixed(2)}</span>
-                        </div>`;
-                });
-                html += `</div>`;
-            }
-
-            html += `<h3 style="color: #34d399; margin: 20px 0 12px;">🥦 Groceries for the Rest</h3>`;
-
-            // Grocery items
-            const gGroups = {};
-            data.grocery_plan.items.forEach(item => {
-                const key = item.location;
-                if (!gGroups[key]) gGroups[key] = { address: item.address, items: [], cost: 0 };
-                gGroups[key].items.push(item);
-                gGroups[key].cost += item.cost;
-            });
-
-            for (const [name, group] of Object.entries(gGroups)) {
-                html += `
-                    <div class="location-group">
-                        <div class="location-header">
-                            <div>
-                                <div class="location-name">${name}</div>
-                                <div class="location-address">${group.address}</div>
-                            </div>
-                            <div class="location-subtotal">$${group.cost.toFixed(2)}</div>
-                        </div>`;
-                group.items.forEach(item => {
-                    html += `
-                        <div class="food-row">
-                            <span class="food-servings">${item.servings.toFixed(1)}x</span>
-                            <span class="food-name">${item.name}</span>
-                            <span class="food-macros">${Math.round(item.protein)}g pro</span>
-                            <span class="food-cost">$${item.cost.toFixed(2)}</span>
-                        </div>`;
-                });
-                html += `</div>`;
-            }
-
+                <div class="summary-card"><div class="summary-grid">
+                    <div><div class="stat-value">${Math.round(data.combined.total_calories)}</div><div class="stat-label">Calories</div></div>
+                    <div><div class="stat-value">${Math.round(data.combined.total_protein)}g</div><div class="stat-label">Protein</div></div>
+                    <div><div class="stat-value">${Math.round(data.combined.total_fat)}g</div><div class="stat-label">Fat</div></div>
+                    <div><div class="stat-value">${Math.round(data.combined.total_carbs)}g</div><div class="stat-label">Carbs</div></div>
+                    <div><div class="stat-value">$${data.combined.total_cost.toFixed(2)}</div><div class="stat-label">Total Cost</div></div>
+                </div></div>
+                <h3 style="color: #38bdf8; margin-bottom: 12px;">Restaurant Meal</h3>`;
+            html += renderGroupItems(data.restaurant_meal.items);
+            html += `<h3 style="color: #34d399; margin: 20px 0 12px;">Groceries for the Rest</h3>`;
+            html += renderGroupItems(data.grocery_plan.items);
             results.innerHTML = html;
+        }
+
+        function renderGroupItems(items) {
+            const groups = {};
+            items.forEach(item => {
+                const key = item.location;
+                if (!groups[key]) groups[key] = { address: item.address, items: [], cost: 0 };
+                groups[key].items.push(item);
+                groups[key].cost += item.cost;
+            });
+            let html = '';
+            for (const [name, group] of Object.entries(groups)) {
+                html += `<div class="location-group"><div class="location-header"><div><div class="location-name">${name}</div><div class="location-address">${group.address}</div></div><div class="location-subtotal">$${group.cost.toFixed(2)}</div></div>`;
+                group.items.forEach(item => {
+                    html += `<div class="food-row"><span class="food-servings">${item.servings.toFixed(1)}x</span><span class="food-name">${item.name}</span><span class="food-macros">${Math.round(item.protein)}g pro</span><span class="food-cost">$${item.cost.toFixed(2)}</span></div>`;
+                });
+                html += `</div>`;
+            }
+            return html;
+        }
+
+        // ---- Nearby Search ----
+        async function searchNearby() {
+            const btn = document.getElementById('searchBtn');
+            const placesList = document.getElementById('placesList');
+            btn.disabled = true;
+            btn.textContent = 'Searching...';
+            placesList.innerHTML = '<div class="loading"><div class="spinner"></div>Finding nearby food...</div>';
+
+            const locationText = document.getElementById('locationInput').value;
+            const radiusMiles = parseFloat(document.getElementById('radiusInput').value) || 1;
+            const type = document.getElementById('typeInput').value;
+            const radiusMeters = Math.round(radiusMiles * 1609.34);
+
+            let lat = 42.3398, lng = -71.0892; // Default: Northeastern
+
+            // Geocode if user typed something
+            if (locationText.trim()) {
+                try {
+                    const geoRes = await fetch(`https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(locationText)}&limit=1`);
+                    const geoData = await geoRes.json();
+                    if (geoData.length > 0) {
+                        lat = parseFloat(geoData[0].lat);
+                        lng = parseFloat(geoData[0].lon);
+                    }
+                } catch (e) {
+                    console.error('Geocoding failed:', e);
+                }
+            }
+
+            try {
+                const res = await fetch(API + "/nearby", {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({ latitude: lat, longitude: lng, radius: radiusMeters, type }),
+                });
+                const data = await res.json();
+
+                // Clear old markers
+                markers.forEach(m => map.removeLayer(m));
+                markers = [];
+
+                // Center map
+                map.setView([lat, lng], radiusMiles <= 1 ? 15 : radiusMiles <= 3 ? 13 : 12);
+
+                // User marker
+                const userMarker = L.circleMarker([lat, lng], {
+                    radius: 10, fillColor: '#38bdf8', color: '#fff',
+                    weight: 3, fillOpacity: 1,
+                }).addTo(map).bindPopup('<b>Your Location</b>');
+                markers.push(userMarker);
+
+                if (!data.places || data.places.length === 0) {
+                    placesList.innerHTML = '<div class="error-card"><h3>No places found</h3><p>Try increasing the radius or changing the type.</p></div>';
+                    btn.disabled = false;
+                    btn.textContent = 'Find Nearby Food';
+                    return;
+                }
+
+                // Add markers and build list
+                let html = `<p style="color:#64748b; margin-bottom:14px; font-size:0.9rem;">Found ${data.places.length} places near you</p>`;
+
+                data.places.forEach((place, i) => {
+                    const isGrocery = place.types.some(t => ['grocery_store', 'supermarket'].includes(t));
+                    const color = isGrocery ? '#34d399' : '#818cf8';
+                    const badgeClass = isGrocery ? 'badge-grocery' : 'badge-restaurant';
+                    const badgeText = isGrocery ? 'Grocery' : 'Restaurant';
+                    const priceText = place.price_level ? place.price_level.replace('PRICE_LEVEL_', '') : '';
+
+                    // Map marker
+                    const marker = L.circleMarker([place.lat, place.lng], {
+                        radius: 7, fillColor: color, color: '#fff',
+                        weight: 2, fillOpacity: 0.9,
+                    }).addTo(map).bindPopup(`
+                        <b>${place.name}</b><br>
+                        <span style="font-size:12px">${place.address}</span><br>
+                        ${place.rating ? '<span style="color:#fbbf24">★ ' + place.rating + '</span>' : ''}
+                        ${priceText ? ' · ' + priceText : ''}
+                        <br><a href="${place.maps_url}" target="_blank" style="font-size:12px">Open in Google Maps</a>
+                    `);
+                    markers.push(marker);
+
+                    // List card
+                    html += `
+                        <div class="place-card" onclick="markers[${i + 1}].openPopup(); map.setView([${place.lat}, ${place.lng}], 16);">
+                            <div>
+                                <div class="place-name">${place.name}</div>
+                                <div class="place-address">${place.address}</div>
+                                <span class="place-type-badge ${badgeClass}">${badgeText}</span>
+                            </div>
+                            <div class="place-meta">
+                                ${place.rating ? '<div class="place-rating">★ ' + place.rating + '</div>' : ''}
+                                <div class="place-price">${priceText}</div>
+                                <a href="${place.maps_url}" target="_blank" class="maps-link" onclick="event.stopPropagation()">Directions</a>
+                            </div>
+                        </div>`;
+                });
+
+                placesList.innerHTML = html;
+
+                // Fit map to all markers
+                const group = L.featureGroup(markers);
+                map.fitBounds(group.getBounds().pad(0.1));
+
+            } catch (err) {
+                placesList.innerHTML = `<div class="error-card"><h3>Error</h3><p>${err.message}</p></div>`;
+            }
+
+            btn.disabled = false;
+            btn.textContent = 'Find Nearby Food';
         }
     </script>
 </body>
